@@ -22,21 +22,21 @@ async function fetchSearch(query: string): Promise<TmdbMedia[]> {
   if (!query.trim()) return [];
   const response = await fetch(`/api/tmdb/search/multi?query=${encodeURIComponent(query)}`);
   if (!response.ok) throw new Error("Search failed");
-  const payload = (await response.json()) as { results?: TmdbMedia[] };
+  const payload = (await response.json()) as { results?: Record<string, unknown>[] };
   return (payload.results ?? [])
-    .filter((item) => item.media_type === "movie" || item.media_type === "tv")
+    .filter((item) => item["media_type"] === "movie" || item["media_type"] === "tv")
     .map((item) => ({
-      id: item.id,
-      title: (item as unknown as { title?: string; name?: string }).title ?? (item as unknown as { name?: string }).name ?? "",
-      overview: item.overview,
-      backdropPath: (item as unknown as { backdrop_path?: string | null }).backdrop_path ?? null,
-      posterPath: (item as unknown as { poster_path?: string | null }).poster_path ?? null,
+      id: Number(item["id"] ?? 0),
+      title: (item as { title?: string; name?: string }).title ?? (item as { name?: string }).name ?? "",
+      overview: String(item["overview"] ?? ""),
+      backdropPath: (item as { backdrop_path?: string | null }).backdrop_path ?? null,
+      posterPath: (item as { poster_path?: string | null }).poster_path ?? null,
       releaseDate:
-        (item as unknown as { release_date?: string; first_air_date?: string }).release_date ??
-        (item as unknown as { first_air_date?: string }).first_air_date ??
+        (item as { release_date?: string; first_air_date?: string }).release_date ??
+        (item as { first_air_date?: string }).first_air_date ??
         null,
-      voteAverage: Number((item as unknown as { vote_average?: number }).vote_average ?? 0),
-      mediaType: (item as unknown as { media_type: "movie" | "tv" }).media_type
+      voteAverage: Number((item as { vote_average?: number }).vote_average ?? 0),
+      mediaType: (item as { media_type: "movie" | "tv" }).media_type
     }));
 }
 
