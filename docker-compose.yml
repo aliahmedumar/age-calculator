@@ -82,13 +82,44 @@ services:
     container_name: webhook-service
     environment:
       - NODE_ENV=production
-      - PORT=${WEBHOOK_PORT}
+      - PORT=3000
       - SONARR_URL=${SONARR_URL}
       - SONARR_API_KEY=${SONARR_API_KEY}
       - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
     ports:
-      - "${WEBHOOK_PORT:-3000}:3000"
+      - "${WEBHOOK_PORT:-3001}:3000"
     depends_on:
       - sonarr
+      - jellyfin
+    restart: unless-stopped
+
+  web-ui:
+    build:
+      context: ./web
+    container_name: web-ui
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - TMDB_BASE_URL=https://api.themoviedb.org/3
+      - SONARR_URL=${SONARR_URL}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_URL=${RADARR_URL}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - QBITTORRENT_URL=${QBITTORRENT_URL}
+      - QBITTORRENT_COOKIE=${QBITTORRENT_COOKIE}
+      - ROOT_MEDIA_PATH=/data/media
+      - RADARR_ROOT_PATH=${RADARR_ROOT_PATH}
+      - SONARR_ROOT_PATH=${SONARR_ROOT_PATH}
+      - RADARR_QUALITY_PROFILE_ID=${RADARR_QUALITY_PROFILE_ID}
+      - SONARR_QUALITY_PROFILE_ID=${SONARR_QUALITY_PROFILE_ID}
+    volumes:
+      - ${ROOT_MEDIA_PATH}:/data/media:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - radarr
+      - sonarr
+      - qbittorrent
       - jellyfin
     restart: unless-stopped

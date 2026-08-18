@@ -1,54 +1,49 @@
-# 4K Automated Streaming + JIT Prefetch Platform
+# StreamHub 4K Platform
 
-This repository provisions a self-hosted media automation stack with:
+Production-oriented, self-hosted streaming automation platform with:
 
-- Radarr, Sonarr, Prowlarr, qBittorrent, Jellyfin (Docker Compose)
-- Strict 4K profile automation for storage-efficient HEVC/x265 Web-DL/micro encodes
-- Node.js TypeScript webhook microservice for Jellyfin playback events
-- JIT next-episode prefetching (next 2 episodes)
-- Janitor cron cleanup (delete/unmonitor watched episodes after 24h)
+- **Media stack**: Radarr, Sonarr, Prowlarr, qBittorrent, Jellyfin
+- **JIT automation**: Jellyfin playback webhook prefetch + janitor cleanup
+- **Standalone web app**: Next.js full-stack gateway UI (Netflix/Stremio-style) to browse, request, track downloads, and stream
 
-## Project Layout
+## Services
 
-- `/docker-compose.yml` - Full stack topology
-- `/.env.example` - Required environment variables
-- `/scripts/init-folders.sh` - Creates media directory structure and permissions
-- `/scripts/profiles/quality-definitions.json` - 4K quality size constraints
-- `/scripts/configure-profiles.ts` - Applies quality definitions to Sonarr/Radarr APIs
-- `/scripts/mock-jellyfin-event.sh` - Sends a mock "finished episode" webhook event
-- `/webhook-service` - Fastify TypeScript service for prefetch + janitor logic
+- `radarr` → `:7878`
+- `sonarr` → `:8989`
+- `prowlarr` → `:9696`
+- `qbittorrent` → `:8080`
+- `jellyfin` → `:8096`
+- `webhook-service` → `:3001` (default external)
+- `web-ui` → `:3000`
 
-## 1) Setup Environment
+## 1) Configure
 
 ```bash
-cp .env.example .env
+cp /home/runner/work/age-calculator/age-calculator/.env.example /home/runner/work/age-calculator/age-calculator/.env
 ```
 
-Edit `.env` and set API keys from Sonarr, Radarr, and Jellyfin.
+Set real API keys in `.env`:
 
-## 2) Initialize Media Folders
+- `TMDB_API_KEY`
+- `SONARR_API_KEY`
+- `RADARR_API_KEY`
+- `JELLYFIN_API_KEY`
+- optionally `QBITTORRENT_COOKIE`
+
+## 2) Initialize folder structure
 
 ```bash
-chmod +x /home/runner/work/age-calculator/age-calculator/scripts/init-folders.sh
 ROOT_MEDIA_PATH=/srv/media PUID=1000 PGID=1000 /home/runner/work/age-calculator/age-calculator/scripts/init-folders.sh
 ```
 
-## 3) Start the Media Stack
+## 3) Start all containers
 
 ```bash
+cd /home/runner/work/age-calculator/age-calculator
 docker compose up -d
 ```
 
-Services:
-
-- Radarr: `http://localhost:7878`
-- Sonarr: `http://localhost:8989`
-- Prowlarr: `http://localhost:9696`
-- qBittorrent: `http://localhost:8080`
-- Jellyfin: `http://localhost:8096`
-- Webhook service: `http://localhost:3000`
-
-## 4) Apply 4K Quality Definitions
+## 4) Apply quality profile sizing (2160p-efficient)
 
 ```bash
 SONARR_URL=http://localhost:8989 \
@@ -58,22 +53,50 @@ RADARR_API_KEY=<radarr-key> \
 node --loader tsx /home/runner/work/age-calculator/age-calculator/scripts/configure-profiles.ts
 ```
 
-This updates Sonarr and Radarr quality-definition sizing for 2160p targets.
+## Web UI Features
 
-## 5) Configure Jellyfin Webhook Plugin
+Open: `http://localhost:3000`
 
-In Jellyfin:
+- Hero + sliders (Trending Movies, Popular Series, Recently Downloaded, Currently Downloading)
+- Debounced search with availability states:
+  - Downloaded (Ready to Stream)
+  - Downloading (Progress %)
+  - Available in 4K (One-Click Request)
+- Media details view with cast, runtime, badges, and TV season list
+- One-click `Fetch in 4K` request routing to Sonarr/Radarr
+- Built-in web video player with subtitle toggle + quality selector
+- Auto prefetch call at 90% playback for TV episodes
+- Download manager dashboard (progress/speed/ETA/seeds)
+- Disk storage health widget
 
-1. Install and enable the Webhook plugin.
-2. Add a destination URL:
-   - `http://webhook-service:3000/api/v1/jellyfin/webhook` (inside Docker network)
-   - Or `http://<host-ip>:3000/api/v1/jellyfin/webhook` (external)
-3. Enable playback events (PlaybackProgress / PlaybackStop).
-4. Include payload fields for series and episode indexing.
+## Next.js API Layer
 
-## 6) Test the Webhook Service
+- `/api/tmdb/*` → TMDB proxy (trending/discovery/details/search)
+- `/api/media/request` → queues movie/series in Radarr/Sonarr
+- `/api/media/downloads` → qBittorrent + Sonarr/Radarr queue aggregation + disk stats
+- `/api/media/status` → media availability state for UI
+- `/api/stream/[id]` → direct file streaming with Range support
+- `/api/prefetch` → monitors + searches next two Sonarr episodes
 
-### Local service test
+## Jellyfin Webhook Test
+
+Run service and trigger a mock completed-playback event:
+
+```bash
+WEBHOOK_URL=http://localhost:3001/api/v1/jellyfin/webhook /home/runner/work/age-calculator/age-calculator/scripts/mock-jellyfin-event.sh
+```
+
+## Local Dev
+
+### Web UI
+
+```bash
+cd /home/runner/work/age-calculator/age-calculator/web
+npm install
+npm run dev
+```
+
+### Webhook Service
 
 ```bash
 cd /home/runner/work/age-calculator/age-calculator/webhook-service
@@ -81,43 +104,14 @@ npm install
 npm run dev
 ```
 
-In another shell:
+## Verification
 
 ```bash
-WEBHOOK_URL=http://localhost:3000/api/v1/jellyfin/webhook \
-/home/runner/work/age-calculator/age-calculator/scripts/mock-jellyfin-event.sh
-```
+cd /home/runner/work/age-calculator/age-calculator/web
+npm run lint
+npm run build
 
-Expected behavior after completed episode event:
-
-- Service resolves the current Sonarr episode
-- Next 2 episodes are set to monitored
-- Sonarr `EpisodeSearch` command is triggered immediately
-- Current watched episode is tracked for janitor cleanup
-
-## 7) Janitor Auto-Cleanup
-
-The webhook service runs a cron job every 6 hours.
-
-For watched episodes older than 24 hours:
-
-- Deletes attached Sonarr episode file (if present)
-- Marks episode unmonitored
-- Removes it from local watched registry
-
-## Webhook Service Environment Variables
-
-- `PORT` (default `3000`)
-- `HOST` (default `0.0.0.0`)
-- `SONARR_URL` (default `http://sonarr:8989`)
-- `SONARR_API_KEY` (required)
-- `JELLYFIN_API_KEY` (optional pass-through for future webhook auth needs)
-
-## Development + Verification
-
-```bash
 cd /home/runner/work/age-calculator/age-calculator/webhook-service
-npm install
 npm run test
 npm run build
 ```

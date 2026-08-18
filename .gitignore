@@ -1,3 +1,5 @@
 .env
 webhook-service/node_modules/
 webhook-service/dist/
+web/node_modules/
+web/.next/
