@@ -1,0 +1,94 @@
+services:
+  radarr:
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./config/radarr:/config
+      - ${ROOT_MEDIA_PATH}/movies:/data/media/movies
+      - ${ROOT_MEDIA_PATH}/torrents:/data/torrents
+    ports:
+      - "7878:7878"
+    restart: unless-stopped
+
+  sonarr:
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./config/sonarr:/config
+      - ${ROOT_MEDIA_PATH}/tv:/data/media/tv
+      - ${ROOT_MEDIA_PATH}/torrents:/data/torrents
+    ports:
+      - "8989:8989"
+    restart: unless-stopped
+
+  prowlarr:
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./config/prowlarr:/config
+    ports:
+      - "9696:9696"
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+      - WEBUI_PORT=8080
+    volumes:
+      - ./config/qbittorrent:/config
+      - ${ROOT_MEDIA_PATH}/torrents:/data/torrents
+      - ${ROOT_MEDIA_PATH}/movies:/data/media/movies
+      - ${ROOT_MEDIA_PATH}/tv:/data/media/tv
+    ports:
+      - "8080:8080"
+      - "6881:6881"
+      - "6881:6881/udp"
+    restart: unless-stopped
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TIMEZONE}
+    volumes:
+      - ./config/jellyfin:/config
+      - ${ROOT_MEDIA_PATH}/movies:/data/media/movies
+      - ${ROOT_MEDIA_PATH}/tv:/data/media/tv
+    ports:
+      - "8096:8096"
+    restart: unless-stopped
+
+  webhook-service:
+    build:
+      context: ./webhook-service
+    container_name: webhook-service
+    environment:
+      - NODE_ENV=production
+      - PORT=${WEBHOOK_PORT}
+      - SONARR_URL=${SONARR_URL}
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - JELLYFIN_API_KEY=${JELLYFIN_API_KEY}
+    ports:
+      - "${WEBHOOK_PORT:-3000}:3000"
+    depends_on:
+      - sonarr
+      - jellyfin
+    restart: unless-stopped

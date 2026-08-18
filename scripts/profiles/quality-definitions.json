@@ -1,0 +1,16 @@
+{
+  "radarr": {
+    "qualityDefinitions": [
+      { "id": 24, "name": "WEBDL-2160p", "minSize": 10000, "preferredSize": 14000, "maxSize": 18000 },
+      { "id": 18, "name": "Bluray-2160p", "minSize": 10000, "preferredSize": 14000, "maxSize": 18000 },
+      { "id": 19, "name": "Remux-2160p", "minSize": 10000, "preferredSize": 16000, "maxSize": 18000 }
+    ]
+  },
+  "sonarr": {
+    "qualityDefinitions": [
+      { "id": 19, "name": "WEBDL-2160p", "minSize": 2000, "preferredSize": 3000, "maxSize": 4000 },
+      { "id": 18, "name": "Bluray-2160p", "minSize": 2000, "preferredSize": 3000, "maxSize": 4000 },
+      { "id": 20, "name": "Remux-2160p", "minSize": 2500, "preferredSize": 3500, "maxSize": 4000 }
+    ]
+  }
+}
